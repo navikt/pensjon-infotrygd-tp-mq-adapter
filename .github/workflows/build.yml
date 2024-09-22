@@ -128,7 +128,7 @@ jobs:
 #      - uses: nais/deploy/actions/deploy@v2
 #        env:
 #          IMAGE: "${{ needs.build.outputs.image }}"
-#          RESOURCE: .nais/unleash-apitoken.yml,.nais/nais.yaml
+#          RESOURCE: .nais/nais.yaml
 #          CLUSTER: 'prod-fss'
 #          VAR: "version=${{ needs.build.outputs.version }}"
 #          VARS: '.nais/vars-prod.yaml'
@@ -152,7 +152,7 @@ jobs:
       - uses: nais/deploy/actions/deploy@v2
         env:
           IMAGE: "${{ needs.build.outputs.image }}"
-          RESOURCE: .nais/unleash-apitoken.yml,.nais/nais.yaml
+          RESOURCE: .nais/nais.yaml
           CLUSTER: 'dev-fss'
           VAR: "version=${{ needs.build.outputs.version }}"
           VARS: '.nais/vars-dev-${{matrix.env}}.yaml'
