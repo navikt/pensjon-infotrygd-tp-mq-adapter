@@ -38,7 +38,7 @@ class InfotrygdService(
         "jms.replyTo" to message.jmsReplyTo.toString(),
     ) {
         val charset = Charset.forName(message.getStringProperty(JMS_IBM_CHARACTER_SET) ?: "ibm277")
-        val correlationId = message.jmsCorrelationID
+        val responseCorrelationId = message.jmsMessageID
 
         val request = try {
             deserialize(bytes, charset)
@@ -58,7 +58,7 @@ class InfotrygdService(
         try {
             jmsTemplate.send(message.jmsReplyTo) {
                 it.createBytesMessage().apply {
-                    jmsCorrelationID = correlationId
+                    jmsCorrelationID = responseCorrelationId
                     writeBytes(messageData)
                     setStringProperty(JMS_IBM_CHARACTER_SET, charset.toString())
                 }
