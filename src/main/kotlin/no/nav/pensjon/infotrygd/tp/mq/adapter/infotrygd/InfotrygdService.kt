@@ -5,11 +5,11 @@ import com.ibm.msg.client.jakarta.wmq.WMQConstants.JMS_IBM_CHARACTER_SET
 import jakarta.jms.Message
 import net.logstash.logback.argument.StructuredArgument
 import net.logstash.logback.argument.StructuredArguments.entries
-import no.nav.pensjon.infotrygd.tp.mq.adapter.utils.mdc
-import no.nav.pensjon.infotrygd.tp.mq.adapter.tp.TjenestepensjonService
 import no.nav.pensjon.infotrygd.tp.mq.adapter.infotrygd.InfotrygdMessage.Companion.deserialize
 import no.nav.pensjon.infotrygd.tp.mq.adapter.infotrygd.InfotrygdMessage.Companion.serialize
 import no.nav.pensjon.infotrygd.tp.mq.adapter.infotrygd.InfotrygdMessage.K278M402
+import no.nav.pensjon.infotrygd.tp.mq.adapter.tp.TjenestepensjonService
+import no.nav.pensjon.infotrygd.tp.mq.adapter.utils.mdc
 import org.slf4j.LoggerFactory.getLogger
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.jms.annotation.JmsListener
@@ -93,30 +93,55 @@ class InfotrygdService(
         try {
             hentMeldinger(inputMelding.outputRecords[0].iFnr!!, inputMelding.outputRecords[0].iFom, inputMelding.outputRecords[0].iTom).let { meldinger ->
                 if (meldinger.isEmpty()) {
-                    opprettMelding(inputMelding, 4, "INGEN DATA FUNNET", 0, meldinger)
+                    opprettMelding(4, "INGEN DATA FUNNET", meldinger)
                 } else {
-                    opprettMelding(inputMelding, null, "INGEN FEIL PÅ RETURNERT MELDING", meldinger.size, meldinger)
+                    opprettMelding(null, "INGEN FEIL PÅ RETURNERT MELDING", meldinger)
                 }
             }
         } catch (e: Exception) {
             logger.warn("Uventet feil oppstod", e)
-            opprettMelding(inputMelding, 8, "SYSTEMFEIL", 1, emptyList())
+            opprettFeilmeding(inputMelding)
         }
 
     private fun opprettMelding(
-        inputMelding: InfotrygdMessage,
         alvorlighetsgrad: Int?,
         beskMelding: String,
-        antall: Int,
         meldinger: List<K278M402>
-    ) = inputMelding.copy(
+    ) = InfotrygdMessage(
         kodeAksjon = "HENT",
+        kilde = "IT00",
+        brukerId = null,
+        lengde = null,
+        dato = null,
+        klokke = null,
+
+        systemId = null,
+        kodeMelding = null,
         alvorlighetsgrad = alvorlighetsgrad,
         beskMelding = beskMelding,
+        sqlKode = null,
+        sqlState = null,
+        sqlMelding = null,
+        mqCompletionCode = null,
+        mqReasonCode = null,
+        progId = null,
+        sectionNavn = null,
+
         copyId = "K278M402",
-        antall = antall,
+        antall = meldinger.size,
+
+        outputRecords = meldinger,
+    )
+
+    private fun opprettFeilmeding(
+        inputMelding: InfotrygdMessage,
+    ) = inputMelding.copy(
+        kodeAksjon = "HENT",
+        alvorlighetsgrad = 8,
+        beskMelding = "SYSTEMFEIL",
+        copyId = "K278M402",
+        antall = 1,
         kilde = "IT00",
-        outputRecords = if (alvorlighetsgrad == 8) inputMelding.outputRecords else meldinger
     )
 
     private fun hentMeldinger(
