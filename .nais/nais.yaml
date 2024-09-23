@@ -49,5 +49,5 @@ spec:
   vault:
     enabled: true
     paths:
-      - kvPath: "{{vault.srvpensjon}}"
+      - kvPath: "{{vault.srvtpmq}}"
         mountPath: "/secrets/srvtpmq"

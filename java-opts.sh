@@ -21,5 +21,5 @@ fi
 # inject proxy settings set by the nais platform
 export JAVA_OPTS="${JAVA_OPTS} ${JAVA_PROXY_OPTIONS}"
 
-export SRVTPMQ_USERNAME=$(cat /secrets/srvpensjon/username)
-export SRVTPMQ_PASSWORD=$(cat /secrets/srvpensjon/password)
+export SRVTPMQ_USERNAME=$(cat /secrets/srvtpmq/username)
+export SRVTPMQ_PASSWORD=$(cat /secrets/srvtpmq/password)

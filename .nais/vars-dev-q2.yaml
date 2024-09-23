@@ -9,4 +9,4 @@ otel:
   logs: otlp
 
 vault:
-  srvpensjon: 'serviceuser/data/dev/srvtpmq'
+  srvtpmq: 'serviceuser/data/dev/srvtpmq'
