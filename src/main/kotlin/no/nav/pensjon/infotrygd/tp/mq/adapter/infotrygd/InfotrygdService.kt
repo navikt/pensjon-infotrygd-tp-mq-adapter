@@ -158,12 +158,12 @@ class InfotrygdService(
                 else -> true
             }
         }.mapNotNull { ytelse ->
-            ytelse.ytelseType.asTpArt()?.let { tpArt ->
+            ytelse.type.asTpArt()?.let { tpArt ->
                 K278M402(
                     iFnr = ident,
                     iFom = null,
                     iTom = null,
-                    oTPnr = forhold.tpNr.toInt(),
+                    oTPnr = forhold.ordning.toInt(),
                     oTPart = tpArt,
                     oFom = ytelse.datoYtelseIverksattFom,
                     oTom = ytelse.datoYtelseIverksattTom,
