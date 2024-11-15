@@ -1,7 +1,7 @@
 package no.nav.pensjon.infotrygd.tp.mq.adapter.infotrygd
 
 import com.ibm.msg.client.jakarta.jms.JmsMessage
-import com.ibm.msg.client.jakarta.wmq.WMQConstants.JMS_IBM_CHARACTER_SET
+import com.ibm.msg.client.jakarta.wmq.WMQConstants.*
 import jakarta.jms.Message
 import net.logstash.logback.argument.StructuredArgument
 import net.logstash.logback.argument.StructuredArguments.entries
@@ -61,6 +61,7 @@ class InfotrygdService(
                     jmsCorrelationID = responseCorrelationId
                     writeBytes(messageData)
                     setStringProperty(JMS_IBM_CHARACTER_SET, charset.toString())
+                    setIntProperty(JMS_IBM_ENCODING, 785)
                 }
             }
         } catch (e: Exception) {
