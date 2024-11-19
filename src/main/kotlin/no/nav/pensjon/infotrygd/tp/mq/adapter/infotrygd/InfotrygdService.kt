@@ -1,8 +1,9 @@
 package no.nav.pensjon.infotrygd.tp.mq.adapter.infotrygd
 
-import com.ibm.msg.client.jakarta.jms.JmsMessage
 import com.ibm.msg.client.jakarta.wmq.WMQConstants.*
+import jakarta.jms.BytesMessage
 import jakarta.jms.Message
+import jakarta.jms.Session
 import net.logstash.logback.argument.StructuredArgument
 import net.logstash.logback.argument.StructuredArguments.entries
 import no.nav.pensjon.infotrygd.tp.mq.adapter.infotrygd.InfotrygdMessage.Companion.deserialize
@@ -23,6 +24,7 @@ class InfotrygdService(
     val jmsTemplate: JmsTemplate,
     val service: TjenestepensjonService,
     @Value("\${infotrygd.k278m402.queue}") val queueName: String,
+    @Value("\${infotrygd.k278m402.busQueue}") val busQueueName: String,
 ) {
     private val logger = getLogger(javaClass)
 
@@ -31,7 +33,7 @@ class InfotrygdService(
         bytes: ByteArray,
         message: Message,
     ) = mdc(
-        "jms.charset" to (message as? JmsMessage)?.getStringProperty(JMS_IBM_CHARACTER_SET),
+        "jms.charset" to message.getStringProperty(JMS_IBM_CHARACTER_SET),
         "jms.correlationId" to message.jmsCorrelationID,
         "jms.messageId" to message.jmsMessageID,
         "jms.queueName" to queueName,
@@ -40,34 +42,72 @@ class InfotrygdService(
         val charset = Charset.forName(message.getStringProperty(JMS_IBM_CHARACTER_SET) ?: "ibm277")
         val responseCorrelationId = message.jmsMessageID
 
-        val request = try {
-            deserialize(bytes, charset)
-        } catch (e: Exception) {
-            logger.error("Feil ved deserialisering av melding fra Infotrygd (charset={})", charset, e)
-            return@mdc
+        val messageData = handleMessage(charset, bytes, message.jmsCorrelationID, message.jmsMessageID, message.getStringProperty(JMS_IBM_CHARACTER_SET))
+
+        if (messageData != null) {
+            try {
+                jmsTemplate.send(message.jmsReplyTo) {
+                    it.createBytesMessage().apply {
+                        jmsCorrelationID = responseCorrelationId
+                        writeBytes(messageData)
+                        setStringProperty(JMS_IBM_CHARACTER_SET, charset.toString())
+                        setIntProperty(JMS_IBM_ENCODING, 785)
+                    }
+                }
+            } catch (e: Exception) {
+                logger.error("Feil ved sending av svar", e)
+                return@mdc
+            }
         }
+    }
 
-        logger.info("Request fra Infotrygd {}", structuredArguments(charset, request))
-
-        val response = hentTjenestepensjonsYtelsesListe(request)
-
-        logger.info("Response til Infotrygd {}", structuredArguments(charset, response))
-
-        val messageData = serialize(response, charset)
+    fun handleMessage(
+        charset: Charset,
+        bytes: ByteArray,
+        jmsCorrelationID: String,
+        messageID: String,
+        jmsIbmCharacterSet: String?,
+    ): ByteArray? {
+        val svarFraBuss = jmsTemplate.sendAndReceive(busQueueName) { session: Session ->
+            session.createBytesMessage().also { bytesMessage ->
+                bytesMessage.jmsCorrelationID = jmsCorrelationID
+                bytesMessage.jmsMessageID = messageID
+                bytesMessage.writeBytes(bytes)
+                jmsIbmCharacterSet?.let { bytesMessage.setStringProperty(JMS_IBM_CHARACTER_SET, it) }
+            }
+        }
+        val bytesBus = (svarFraBuss as BytesMessage).asByteArray()
 
         try {
-            jmsTemplate.send(message.jmsReplyTo) {
-                it.createBytesMessage().apply {
-                    jmsCorrelationID = responseCorrelationId
-                    writeBytes(messageData)
-                    setStringProperty(JMS_IBM_CHARACTER_SET, charset.toString())
-                    setIntProperty(JMS_IBM_ENCODING, 785)
-                }
+            val request = try {
+                deserialize(bytes, charset)
+            } catch (e: Exception) {
+                logger.error("Feil ved deserialisering av melding fra Infotrygd (charset={})", charset, e)
+                return null
+            }
+
+            logger.info("Request fra Infotrygd {}", structuredArguments(charset, request))
+
+            val response = hentTjenestepensjonsYtelsesListe(request)
+
+            logger.info("Response til Infotrygd {}", structuredArguments(charset, response))
+
+            val messageData = serialize(response, charset)
+
+            if (bytesBus.size != messageData.size || !bytesBus.contentEquals(messageData)) {
+                logger.info("Innholdet er forskjellig, bus=${bytesBus.size}, svar=${messageData.size}")
+
+                logger.info("Request hex {}", bytes.toHex())
+                logger.info("Bytes bus hex {}", bytesBus.toHex())
+                logger.info("Bytes svar hex {}", messageData.toHex())
+            } else {
+                logger.info("Innholdet er likt med bus")
             }
         } catch (e: Exception) {
-            logger.error("Feil ved sending av svar", e)
-            return@mdc
+            logger.error("Feil ved sammenligning med svar fra buss", e)
         }
+
+        return bytesBus
     }
 
     private fun structuredArguments(
@@ -181,4 +221,11 @@ class InfotrygdService(
         "AFP" -> 6
         else -> null
     }
+
+    private fun BytesMessage.asByteArray() =
+        ByteArray(bodyLength.toInt()).also {
+            readBytes(it)
+        }
+
+    fun ByteArray.toHex(): String = joinToString(separator = "") { eachByte -> "%02x".format(eachByte) }
 }
