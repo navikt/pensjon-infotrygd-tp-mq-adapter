@@ -1,0 +1,12 @@
+app:
+  name: 'pensjon-infotrygd-tp-mq-adapter-q0'
+  namespace: 'pensjonsamhandling'
+  team: 'pensjonsamhandling'
+  env: q0
+  profile: q0
+
+otel:
+  logs: none
+
+vault:
+  srvtpmq: 'serviceuser/data/dev/srvtpmq'

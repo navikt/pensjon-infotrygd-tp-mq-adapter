@@ -116,22 +116,22 @@ jobs:
           image_ref: "${{ needs.build.outputs.image-digest }}"
           sbom: "trivy-results.cyclonedx"
 
-#  deploy:
-#    if: github.ref == 'refs/heads/main'
-#    permissions:
-#      contents: read
-#      id-token: write
-#    needs: [build]
-#    runs-on: 'ubuntu-latest'
-#    steps:
-#      - uses: actions/checkout@v4
-#      - uses: nais/deploy/actions/deploy@v2
-#        env:
-#          IMAGE: "${{ needs.build.outputs.image }}"
-#          RESOURCE: .nais/nais.yaml
-#          CLUSTER: 'prod-fss'
-#          VAR: "version=${{ needs.build.outputs.version }}"
-#          VARS: '.nais/vars-prod.yaml'
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      id-token: write
+    needs: [build]
+    runs-on: 'ubuntu-latest'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: nais/deploy/actions/deploy@v2
+        env:
+          IMAGE: "${{ needs.build.outputs.image }}"
+          RESOURCE: .nais/nais.yaml
+          CLUSTER: 'prod-fss'
+          VAR: "version=${{ needs.build.outputs.version }}"
+          VARS: '.nais/vars-prod.yaml'
 
   deployQ:
     if: github.ref == 'refs/heads/main'
@@ -144,6 +144,7 @@ jobs:
     strategy:
       matrix:
         include:
+          - env: q0
           - env: q1
           - env: q2
 
