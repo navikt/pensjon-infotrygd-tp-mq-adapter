@@ -42,7 +42,13 @@ class InfotrygdService(
         val charset = Charset.forName(message.getStringProperty(JMS_IBM_CHARACTER_SET) ?: "ibm277")
         val responseCorrelationId = message.jmsMessageID
 
-        val messageData = handleMessage(charset, bytes, message.jmsCorrelationID, message.jmsMessageID, message.getStringProperty(JMS_IBM_CHARACTER_SET))
+        val messageData = handleMessage(
+            charset,
+            bytes,
+            message.jmsCorrelationID,
+            message.jmsMessageID,
+            message.getStringProperty(JMS_IBM_CHARACTER_SET)
+        )
 
         if (messageData != null) {
             try {
@@ -94,7 +100,7 @@ class InfotrygdService(
 
             val messageData = serialize(response, charset)
 
-            if (!erMeldingerLike(bytesBus, messageData)) {
+            if (!erMeldingerLike(bytesBus, messageData, charset)) {
                 logger.info("Innholdet er forskjellig, bus=${bytesBus.size}, svar=${messageData.size}")
 
                 logger.info("Request hex {}", bytes.toHex())
@@ -209,7 +215,7 @@ class InfotrygdService(
                 oTom = ytelse.datoYtelseIverksattTom,
             )
         }
-    } .sortedBy { it.oFom }
+    }.sortedBy { it.oFom }
 
     private fun String.asTpArt(): Int? = when (this) {
         "ALDER" -> 1
@@ -228,8 +234,7 @@ class InfotrygdService(
     fun ByteArray.toHex(): String = joinToString(separator = "") { eachByte -> "%02x".format(eachByte) }
 
     companion object {
-        fun erMeldingerLike(bytesBus: ByteArray, messageData: ByteArray) =
+        fun erMeldingerLike(bytesBus: ByteArray, messageData: ByteArray, charset: Charset): Boolean =
             bytesBus.size == messageData.size && bytesBus.contentEquals(messageData)
-
     }
 }
