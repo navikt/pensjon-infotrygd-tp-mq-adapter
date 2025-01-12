@@ -56,7 +56,7 @@ class InfotrygdServiceTest {
     }
 
     @Test
-    fun `ulik sortering paa data gir ulik`() {
+    fun `ulik sortering paa oFom gir ulik`() {
         val fom1 = k278M402(oFom = LocalDate.of(2025, 1, 1))
         val fom2 = k278M402(oFom = LocalDate.of(2025, 2, 1))
 
@@ -65,6 +65,87 @@ class InfotrygdServiceTest {
 
         assertFalse { erMeldingerLike(melding1, melding2, charset) }
     }
+
+    @Test
+    fun `forskjellig sortering paa oTPArt anses som likt`() {
+        val record1 = k278M402(oTPart = 1)
+        val record2 = k278M402(oTPart = 2)
+        val record3 = k278M402(oTPart = 3)
+
+        assertTrue {
+            erMeldingerLike(
+                lagInfotrygdmelding(outputRecords = listOf(record1, record2, record3)),
+                lagInfotrygdmelding(outputRecords = listOf(record2, record1, record3)),
+                charset
+            )
+        }
+    }
+
+    @Test
+    fun `forskjellig sortering paa alt utenom oFom anses som likt`() {
+        assertFalse { erMeldingerLike(k278M402(oFom = null), k278M402(oFom = LocalDate.of(2025, 2, 1))) }
+        assertFalse { erMeldingerLike(k278M402(oFom = LocalDate.of(2025, 1, 1)), k278M402(oFom = LocalDate.of(2025, 2, 1))) }
+        assertFalse { erMeldingerLike(k278M402(oFom = LocalDate.of(2025, 1, 1)), k278M402(oFom = null)) }
+
+        assertTrue { erMeldingerLike(k278M402(iFnr = "1"), k278M402(iFnr = "2")) }
+        assertTrue { erMeldingerLike(k278M402(iFom = LocalDate.of(2025, 1, 1)), k278M402(iFom = LocalDate.of(2025, 2, 1))) }
+        assertTrue { erMeldingerLike(k278M402(iTom = LocalDate.of(2025, 1, 1)), k278M402(iTom = LocalDate.of(2025, 2, 1))) }
+
+        assertTrue { erMeldingerLike(k278M402(oTPnr = 1), k278M402(oTPnr = 2)) }
+        assertTrue { erMeldingerLike(k278M402(oTPart = 1), k278M402(oTPart = 2)) }
+        assertTrue { erMeldingerLike(k278M402(oTom = LocalDate.of(2025, 1, 1)), k278M402(oTom = LocalDate.of(2025, 2, 1))) }
+
+        assertTrue {
+            erMeldingerLike(
+                k278M402(
+                    iFnr = "1",
+                    iFom = LocalDate.of(2025, 1, 1),
+                    iTom = LocalDate.of(2025, 1, 1),
+                    oTPnr = 1,
+                    oTPart = 1,
+                    oTom = LocalDate.of(2025, 1, 1),
+                ),
+                k278M402(
+                    iFnr = "2",
+                    iFom = LocalDate.of(2025, 2, 1),
+                    iTom = LocalDate.of(2025, 2, 1),
+                    oTPnr = 2,
+                    oTPart = 2,
+                    oTom = LocalDate.of(2025, 2, 1),
+                )
+            )
+        }
+
+        assertFalse {
+            erMeldingerLike(
+                k278M402(
+                    iFnr = "1",
+                    iFom = LocalDate.of(2025, 1, 1),
+                    iTom = LocalDate.of(2025, 1, 1),
+                    oTPnr = 1,
+                    oTPart = 1,
+                    oFom = LocalDate.of(2025, 1, 1),
+                    oTom = LocalDate.of(2025, 1, 1),
+                ),
+                k278M402(
+                    iFnr = "2",
+                    iFom = LocalDate.of(2025, 2, 1),
+                    iTom = LocalDate.of(2025, 2, 1),
+                    oTPnr = 2,
+                    oTPart = 2,
+                    oFom = LocalDate.of(2025, 2, 1),
+                    oTom = LocalDate.of(2025, 2, 1),
+                )
+            )
+        }
+    }
+
+    private fun erMeldingerLike(elements1: K278M402, elements2: K278M402) =
+        erMeldingerLike(
+            lagInfotrygdmelding(outputRecords = listOf(elements1, elements2)),
+            lagInfotrygdmelding(outputRecords = listOf(elements2, elements1)),
+            charset
+        )
 
     private fun k278M402(
         iFnr: String? = "12345678901",
