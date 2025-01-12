@@ -234,7 +234,62 @@ class InfotrygdService(
     fun ByteArray.toHex(): String = joinToString(separator = "") { eachByte -> "%02x".format(eachByte) }
 
     companion object {
-        fun erMeldingerLike(bytesBus: ByteArray, messageData: ByteArray, charset: Charset): Boolean =
-            bytesBus.size == messageData.size && bytesBus.contentEquals(messageData)
+        fun erMeldingerLike(bytesBus: ByteArray, messageData: ByteArray, charset: Charset): Boolean {
+            return if (bytesBus.size == messageData.size) {
+                val bussMessage = deserialize(bytesBus, charset)
+                val message = deserialize(messageData, charset)
+
+                return bussMessage.kodeAksjon == message.kodeAksjon
+                        && bussMessage.kilde == message.kilde
+                        && bussMessage.brukerId == message.brukerId
+                        && bussMessage.lengde == message.lengde
+                        && bussMessage.dato == message.dato
+                        && bussMessage.klokke == message.klokke
+
+                        && bussMessage.systemId == message.systemId
+                        && bussMessage.kodeMelding == message.kodeMelding
+                        && bussMessage.alvorlighetsgrad == message.alvorlighetsgrad
+                        && bussMessage.beskMelding == message.beskMelding
+                        && bussMessage.sqlKode == message.sqlKode
+                        && bussMessage.sqlState == message.sqlState
+                        && bussMessage.sqlMelding == message.sqlMelding
+                        && bussMessage.mqCompletionCode == message.mqCompletionCode
+                        && bussMessage.mqReasonCode == message.mqReasonCode
+                        && bussMessage.progId == message.progId
+                        && bussMessage.sectionNavn == message.sectionNavn
+
+                        && bussMessage.copyId == message.copyId
+                        && bussMessage.antall == message.antall
+                        && bussMessage.outputRecords.size == message.outputRecords.size
+                        && erOutputRecordsSortertEtterOFom(bussMessage.outputRecords)
+                        && erOutputRecordsSortertEtterOFom(message.outputRecords)
+                        && erOutputRecordsLike(bussMessage.outputRecords, message.outputRecords)
+            } else {
+                false
+            }
+        }
+
+        private fun erOutputRecordsSortertEtterOFom(outputRecords: List<K278M402>): Boolean {
+            val oFoms = outputRecords.map { it.oFom }
+            return oFoms == oFoms.sortedBy { it }
+        }
+
+        private fun erOutputRecordsLike(
+            outputRecords: List<K278M402>,
+            outputRecords1: List<K278M402>
+        ): Boolean {
+            val comparator = compareBy<K278M402>(
+                { it.iFnr },
+                { it.iFom },
+                { it.iTom },
+                { it.oTPnr },
+                { it.oTPart },
+                { it.oFom },
+                { it.oTom },
+            )
+
+            return outputRecords.sortedWith(comparator) == outputRecords1.sortedWith(comparator)
+        }
+
     }
 }
