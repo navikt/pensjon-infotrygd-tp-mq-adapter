@@ -94,7 +94,7 @@ class InfotrygdService(
 
             val messageData = serialize(response, charset)
 
-            if (bytesBus.size != messageData.size || !bytesBus.contentEquals(messageData)) {
+            if (!erMeldingerLike(bytesBus, messageData)) {
                 logger.info("Innholdet er forskjellig, bus=${bytesBus.size}, svar=${messageData.size}")
 
                 logger.info("Request hex {}", bytes.toHex())
@@ -226,4 +226,10 @@ class InfotrygdService(
         }
 
     fun ByteArray.toHex(): String = joinToString(separator = "") { eachByte -> "%02x".format(eachByte) }
+
+    companion object {
+        fun erMeldingerLike(bytesBus: ByteArray, messageData: ByteArray) =
+            bytesBus.size == messageData.size && bytesBus.contentEquals(messageData)
+
+    }
 }
