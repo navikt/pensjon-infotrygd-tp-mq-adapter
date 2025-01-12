@@ -5,10 +5,7 @@ import no.nav.pensjon.infotrygd.tp.mq.adapter.infotrygd.InfotrygdMessage.Compani
 import java.nio.charset.Charset
 import java.time.LocalDate
 import java.time.Month
-import kotlin.test.Test
-import kotlin.test.assertContentEquals
-import kotlin.test.assertEquals
-import kotlin.test.assertNull
+import kotlin.test.*
 
 class InfotrygdMessageKtTest {
     @Test
@@ -195,12 +192,5 @@ class InfotrygdMessageKtTest {
         val output = serialize(message, charset)
         assertContentEquals(input, output)
     }
-
-    private fun readResource(navn: String): InfotrygdMessage =
-        deserialize(readResourceBytes(navn), Charset.forName("ibm277"))
-
-    private fun readResourceBytes(navn: String) = (javaClass.getResourceAsStream(navn)?.use {
-        it.readBytes()
-    } ?: throw RuntimeException("Fant ikke ressursen $navn"))
 
 }
