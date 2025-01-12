@@ -198,18 +198,16 @@ class InfotrygdService(
                 datoFom != null -> it.isIverksattDatesOverlapping(datoFom)
                 else -> true
             }
-        }.mapNotNull { ytelse ->
-            ytelse.type.asTpArt()?.let { tpArt ->
-                K278M402(
-                    iFnr = ident,
-                    iFom = null,
-                    iTom = null,
-                    oTPnr = forhold.ordning.toInt(),
-                    oTPart = tpArt,
-                    oFom = ytelse.datoYtelseIverksattFom,
-                    oTom = ytelse.datoYtelseIverksattTom,
-                )
-            }
+        }.map { ytelse ->
+            K278M402(
+                iFnr = ident,
+                iFom = null,
+                iTom = null,
+                oTPnr = forhold.ordning.toInt(),
+                oTPart = ytelse.type.asTpArt(),
+                oFom = ytelse.datoYtelseIverksattFom,
+                oTom = ytelse.datoYtelseIverksattTom,
+            )
         }
     } .sortedBy { it.oFom }
 
