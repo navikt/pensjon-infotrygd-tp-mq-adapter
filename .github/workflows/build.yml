@@ -65,6 +65,7 @@ jobs:
           retention-days: 5
 
       - name: NAIS login
+        if: github.ref == 'refs/heads/main'
         uses: nais/login@v0
         id: login
         with:
@@ -73,6 +74,7 @@ jobs:
           team: pensjonsamhandling
 
       - name: "Build and publish Docker image"
+        if: github.ref == 'refs/heads/main'
         id: build_push
         uses: docker/build-push-action@v6
         with:
@@ -85,6 +87,7 @@ jobs:
           cache-to: type=inline
 
   attest-sign:
+    if: github.ref == 'refs/heads/main'
     permissions:
       contents: read
       id-token: write
