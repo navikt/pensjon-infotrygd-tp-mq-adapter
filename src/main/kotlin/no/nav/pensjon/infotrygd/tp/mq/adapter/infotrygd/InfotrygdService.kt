@@ -6,6 +6,7 @@ import jakarta.jms.Message
 import jakarta.jms.Session
 import net.logstash.logback.argument.StructuredArgument
 import net.logstash.logback.argument.StructuredArguments.entries
+import net.logstash.logback.marker.Markers.appendEntries
 import no.nav.pensjon.infotrygd.tp.mq.adapter.infotrygd.InfotrygdMessage.Companion.deserialize
 import no.nav.pensjon.infotrygd.tp.mq.adapter.infotrygd.InfotrygdMessage.Companion.serialize
 import no.nav.pensjon.infotrygd.tp.mq.adapter.infotrygd.InfotrygdMessage.K278M402
@@ -16,8 +17,10 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.jms.annotation.JmsListener
 import org.springframework.jms.core.JmsTemplate
 import org.springframework.stereotype.Service
+import java.lang.System.nanoTime
 import java.nio.charset.Charset
 import java.time.LocalDate
+import java.util.concurrent.TimeUnit.NANOSECONDS
 
 @Service
 class InfotrygdService(
@@ -39,6 +42,9 @@ class InfotrygdService(
         "jms.queueName" to queueName,
         "jms.replyTo" to message.jmsReplyTo.toString(),
     ) {
+        val start = nanoTime()
+        logger.info("Mottok melding fra Infotrygd")
+
         val charset = Charset.forName(message.getStringProperty(JMS_IBM_CHARACTER_SET) ?: "ibm277")
         val responseCorrelationId = message.jmsMessageID
 
@@ -65,6 +71,18 @@ class InfotrygdService(
                 return@mdc
             }
         }
+
+        val executionTimeMillis = NANOSECONDS.toMillis(nanoTime() - start)
+
+        logger.info(
+            appendEntries(
+                mapOf(
+                    "response_time" to executionTimeMillis,
+                    "elapsed_time" to executionTimeMillis,
+                )
+            ),
+            "Behandling av melding fra Infotrygd tok {} ms", executionTimeMillis
+        )
     }
 
     fun handleMessage(
