@@ -31,7 +31,7 @@ class InfotrygdService(
 ) {
     private val logger = getLogger(javaClass)
 
-    @JmsListener(destination = "\${infotrygd.k278m402.queue}")
+    @JmsListener(destination = "\${infotrygd.k278m402.queue}", concurrency = "1-5")
     fun hentTjenestepensjonsYtelsesListe(
         bytes: ByteArray,
         message: Message,
