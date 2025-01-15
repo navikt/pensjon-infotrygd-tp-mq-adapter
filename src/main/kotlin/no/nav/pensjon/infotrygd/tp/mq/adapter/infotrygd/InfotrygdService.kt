@@ -82,6 +82,12 @@ class InfotrygdService(
                 jmsIbmCharacterSet?.let { bytesMessage.setStringProperty(JMS_IBM_CHARACTER_SET, it) }
             }
         }
+
+        if (svarFraBuss == null) {
+            logger.error("Ingen svar fra buss")
+            return null
+        }
+
         val bytesBus = (svarFraBuss as BytesMessage).asByteArray()
 
         try {
