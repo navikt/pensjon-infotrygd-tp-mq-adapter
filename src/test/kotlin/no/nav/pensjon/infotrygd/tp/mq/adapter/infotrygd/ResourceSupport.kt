@@ -6,6 +6,6 @@ import java.nio.charset.Charset
 fun readResource(navn: String): InfotrygdMessage =
     deserialize(readResourceBytes(navn), Charset.forName("ibm277"))
 
-fun readResourceBytes(navn: String) = (InfotrygdServiceTest::class.java.getResourceAsStream(navn)?.use {
+fun readResourceBytes(navn: String) = (InfotrygdMessageKtTest::class.java.getResourceAsStream(navn)?.use {
     it.readBytes()
 } ?: throw RuntimeException("Fant ikke ressursen $navn"))
