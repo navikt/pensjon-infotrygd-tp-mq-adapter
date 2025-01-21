@@ -1,9 +1,7 @@
 package no.nav.pensjon.infotrygd.tp.mq.adapter.infotrygd
 
 import com.ibm.msg.client.jakarta.wmq.WMQConstants.*
-import jakarta.jms.BytesMessage
 import jakarta.jms.Message
-import jakarta.jms.Session
 import net.logstash.logback.argument.StructuredArgument
 import net.logstash.logback.argument.StructuredArguments.entries
 import net.logstash.logback.marker.Markers.appendEntries
@@ -27,7 +25,6 @@ class InfotrygdService(
     val jmsTemplate: JmsTemplate,
     val service: TjenestepensjonService,
     @Value("\${infotrygd.k278m402.queue}") val queueName: String,
-    @Value("\${infotrygd.k278m402.busQueue}") val busQueueName: String,
 ) {
     private val logger = getLogger(javaClass)
 
@@ -46,30 +43,26 @@ class InfotrygdService(
         logger.info("Mottok melding fra Infotrygd")
 
         val charset = Charset.forName(message.getStringProperty(JMS_IBM_CHARACTER_SET) ?: "ibm277")
-        val responseCorrelationId = message.jmsMessageID
 
-        val messageData = handleMessage(
-            charset,
-            bytes,
-            message.jmsCorrelationID,
-            message.jmsMessageID,
-            message.getStringProperty(JMS_IBM_CHARACTER_SET)
-        )
+        try {
+            val request = deserialize(bytes, charset)
 
-        if (messageData != null) {
-            try {
-                jmsTemplate.send(message.jmsReplyTo) {
-                    it.createBytesMessage().apply {
-                        jmsCorrelationID = responseCorrelationId
-                        writeBytes(messageData)
-                        setStringProperty(JMS_IBM_CHARACTER_SET, charset.toString())
-                        setIntProperty(JMS_IBM_ENCODING, 785)
-                    }
+            logger.info("Request fra Infotrygd {}", structuredArguments(charset, request))
+
+            val response = hentTjenestepensjonsYtelsesListe(request)
+
+            logger.info("Response til Infotrygd {}", structuredArguments(charset, response))
+
+            jmsTemplate.send(message.jmsReplyTo) {
+                it.createBytesMessage().apply {
+                    jmsCorrelationID = message.jmsMessageID
+                    writeBytes(serialize(response, charset))
+                    setStringProperty(JMS_IBM_CHARACTER_SET, charset.toString())
+                    setIntProperty(JMS_IBM_ENCODING, 785)
                 }
-            } catch (e: Exception) {
-                logger.error("Feil ved sending av svar", e)
-                return@mdc
             }
+        } catch (e: Exception) {
+            logger.error("Uventet feil ved håndtering av melding fra Infotrygd", e)
         }
 
         val executionTimeMillis = NANOSECONDS.toMillis(nanoTime() - start)
@@ -83,61 +76,6 @@ class InfotrygdService(
             ),
             "Behandling av melding fra Infotrygd tok {} ms", executionTimeMillis
         )
-    }
-
-    fun handleMessage(
-        charset: Charset,
-        bytes: ByteArray,
-        jmsCorrelationID: String,
-        messageID: String,
-        jmsIbmCharacterSet: String?,
-    ): ByteArray? {
-        val svarFraBuss = jmsTemplate.sendAndReceive(busQueueName) { session: Session ->
-            session.createBytesMessage().also { bytesMessage ->
-                bytesMessage.jmsCorrelationID = jmsCorrelationID
-                bytesMessage.jmsMessageID = messageID
-                bytesMessage.writeBytes(bytes)
-                jmsIbmCharacterSet?.let { bytesMessage.setStringProperty(JMS_IBM_CHARACTER_SET, it) }
-            }
-        }
-
-        if (svarFraBuss == null) {
-            logger.error("Ingen svar fra buss")
-            return null
-        }
-
-        val bytesBus = (svarFraBuss as BytesMessage).asByteArray()
-
-        try {
-            val request = try {
-                deserialize(bytes, charset)
-            } catch (e: Exception) {
-                logger.error("Feil ved deserialisering av melding fra Infotrygd (charset={})", charset, e)
-                return null
-            }
-
-            logger.info("Request fra Infotrygd {}", structuredArguments(charset, request))
-
-            val response = hentTjenestepensjonsYtelsesListe(request)
-
-            logger.info("Response til Infotrygd {}", structuredArguments(charset, response))
-
-            val messageData = serialize(response, charset)
-
-            if (!erMeldingerLike(bytesBus, messageData, charset)) {
-                logger.info("Innholdet er forskjellig, bus=${bytesBus.size}, svar=${messageData.size}")
-
-                logger.info("Request hex {}", bytes.toHex())
-                logger.info("Bytes bus hex {}", bytesBus.toHex())
-                logger.info("Bytes svar hex {}", messageData.toHex())
-            } else {
-                logger.info("Innholdet er likt med bus")
-            }
-        } catch (e: Exception) {
-            logger.error("Feil ved sammenligning med svar fra buss", e)
-        }
-
-        return bytesBus
     }
 
     private fun structuredArguments(
@@ -248,72 +186,5 @@ class InfotrygdService(
         "BARN" -> 5
         "AFP" -> 6
         else -> null
-    }
-
-    private fun BytesMessage.asByteArray() =
-        ByteArray(bodyLength.toInt()).also {
-            readBytes(it)
-        }
-
-    fun ByteArray.toHex(): String = joinToString(separator = "") { eachByte -> "%02x".format(eachByte) }
-
-    companion object {
-        fun erMeldingerLike(bytesBus: ByteArray, messageData: ByteArray, charset: Charset): Boolean {
-            return if (bytesBus.size == messageData.size) {
-                val bussMessage = deserialize(bytesBus, charset)
-                val message = deserialize(messageData, charset)
-
-                return bussMessage.kodeAksjon == message.kodeAksjon
-                        && bussMessage.kilde == message.kilde
-                        && bussMessage.brukerId == message.brukerId
-                        && bussMessage.lengde == message.lengde
-                        && bussMessage.dato == message.dato
-                        && bussMessage.klokke == message.klokke
-
-                        && bussMessage.systemId == message.systemId
-                        && bussMessage.kodeMelding == message.kodeMelding
-                        && bussMessage.alvorlighetsgrad == message.alvorlighetsgrad
-                        && bussMessage.beskMelding == message.beskMelding
-                        && bussMessage.sqlKode == message.sqlKode
-                        && bussMessage.sqlState == message.sqlState
-                        && bussMessage.sqlMelding == message.sqlMelding
-                        && bussMessage.mqCompletionCode == message.mqCompletionCode
-                        && bussMessage.mqReasonCode == message.mqReasonCode
-                        && bussMessage.progId == message.progId
-                        && bussMessage.sectionNavn == message.sectionNavn
-
-                        && bussMessage.copyId == message.copyId
-                        && bussMessage.antall == message.antall
-                        && bussMessage.outputRecords.size == message.outputRecords.size
-                        && erOutputRecordsSortertEtterOFom(bussMessage.outputRecords)
-                        && erOutputRecordsSortertEtterOFom(message.outputRecords)
-                        && erOutputRecordsLike(bussMessage.outputRecords, message.outputRecords)
-            } else {
-                false
-            }
-        }
-
-        private fun erOutputRecordsSortertEtterOFom(outputRecords: List<K278M402>): Boolean {
-            val oFoms = outputRecords.map { it.oFom }
-            return oFoms == oFoms.sortedBy { it }
-        }
-
-        private fun erOutputRecordsLike(
-            outputRecords: List<K278M402>,
-            outputRecords1: List<K278M402>
-        ): Boolean {
-            val comparator = compareBy<K278M402>(
-                { it.iFnr },
-                { it.iFom },
-                { it.iTom },
-                { it.oTPnr },
-                { it.oTPart },
-                { it.oFom },
-                { it.oTom },
-            )
-
-            return outputRecords.sortedWith(comparator) == outputRecords1.sortedWith(comparator)
-        }
-
     }
 }
