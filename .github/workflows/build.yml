@@ -21,7 +21,7 @@ jobs:
       image-digest: "${{ steps.login.outputs.registry }}/${{ github.repository }}/pensjon-infotrygd-tp-mq-adapter@${{ steps.build_push.outputs.digest }}"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set version
         id: version
@@ -94,7 +94,7 @@ jobs:
     needs: [build]
     runs-on: 'ubuntu-latest'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: NAIS login
         uses: nais/login@v0
@@ -127,7 +127,7 @@ jobs:
     needs: [build]
     runs-on: 'ubuntu-latest'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: nais/deploy/actions/deploy@v2
         env:
           IMAGE: "${{ needs.build.outputs.image }}"
@@ -152,7 +152,7 @@ jobs:
           - env: q2
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: nais/deploy/actions/deploy@v2
         env:
           IMAGE: "${{ needs.build.outputs.image }}"
