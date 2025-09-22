@@ -1,4 +1,4 @@
-FROM eclipse-temurin:23-jre
+FROM eclipse-temurin:24-jre
 
 RUN apt-get update && apt-get install -y \
   curl \
