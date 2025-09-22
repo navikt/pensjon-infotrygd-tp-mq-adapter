@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.4.4</version>
+        <version>3.5.6</version>
         <relativePath/>
     </parent>
     <groupId>no.nav.pensjon.infotrygd.tp.mq</groupId>
@@ -21,7 +21,7 @@
         <dependency>
             <groupId>com.ibm.mq</groupId>
             <artifactId>mq-jms-spring-boot-starter</artifactId>
-            <version>3.4.3</version>
+            <version>3.5.5</version>
         </dependency>
         <dependency>
             <groupId>net.logstash.logback</groupId>
