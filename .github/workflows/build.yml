@@ -21,7 +21,7 @@ jobs:
       image-digest: "${{ steps.login.outputs.registry }}/${{ github.repository }}/pensjon-infotrygd-tp-mq-adapter@${{ steps.build_push.outputs.digest }}"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set version
         id: version
@@ -33,7 +33,7 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '21'
@@ -94,7 +94,7 @@ jobs:
     needs: [build]
     runs-on: 'ubuntu-latest'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: NAIS login
         uses: nais/login@v0
@@ -105,7 +105,7 @@ jobs:
           team: pensjonsamhandling
 
       - name: 'Generate SBOM'
-        uses: aquasecurity/trivy-action@0.30.0
+        uses: aquasecurity/trivy-action@0.33.1
         with:
           scan-type: 'image'
           format: 'cyclonedx'
@@ -127,7 +127,7 @@ jobs:
     needs: [build]
     runs-on: 'ubuntu-latest'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: nais/deploy/actions/deploy@v2
         env:
           IMAGE: "${{ needs.build.outputs.image }}"
@@ -152,7 +152,7 @@ jobs:
           - env: q2
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: nais/deploy/actions/deploy@v2
         env:
           IMAGE: "${{ needs.build.outputs.image }}"
