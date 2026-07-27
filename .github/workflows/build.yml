@@ -57,7 +57,7 @@ jobs:
           COMMIT=$(git rev-parse --short=12 HEAD)
           echo "version=$TIME-$COMMIT" >> $GITHUB_OUTPUT
       - name: Download JAR
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: app-jar
           path: target/
