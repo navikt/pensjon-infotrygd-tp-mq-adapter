@@ -8,6 +8,11 @@ import org.springframework.boot.runApplication
 import org.springframework.context.annotation.Bean
 import org.springframework.web.client.RestClient
 
+import org.springframework.retry.annotation.Backoff
+import org.springframework.retry.annotation.EnableRetry
+import org.springframework.retry.annotation.Retryable
+
+@EnableRetry
 @SpringBootApplication
 class Application {
     @Bean
