@@ -3,6 +3,8 @@ package no.nav.pensjon.infotrygd.tp.mq.adapter.tp
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import no.nav.pensjon.infotrygd.tp.mq.adapter.utils.isOverlapping
 import org.springframework.http.MediaType.APPLICATION_JSON
+import org.springframework.retry.annotation.Backoff
+import org.springframework.retry.annotation.Retryable
 import org.springframework.stereotype.Service
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.body
@@ -12,6 +14,7 @@ import java.time.LocalDate
 class TjenestepensjonService(
     private val tpRestClient: RestClient,
 ) {
+    @Retryable(maxAttempts = 3, backoff = Backoff(delay = 500))
     fun hentTjenestepensjon(fnr: String): List<ForholdModel> {
         val tjenestepensjon: TjenestepensjonModel = tpRestClient.get()
             .uri("/api/tjenestepensjon/")
@@ -19,7 +22,7 @@ class TjenestepensjonService(
             .header("fnr", fnr)
             .retrieve()
             .body()
-            ?: throw RuntimeException("Fikk tomt svar fra tp-registeret")
+            ?: throw TjenestepensjonException("Fikk tomt svar fra tp-registeret")
 
         return tjenestepensjon.forhold
     }
