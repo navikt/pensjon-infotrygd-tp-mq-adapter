@@ -1,101 +1,115 @@
-name: "Build and deploy"
+name: Build and Deploy
 
 on:
-  push
-
-env:
-  IMAGE_BASE: ghcr.io/${{ github.repository }}
+  push:
+  workflow_dispatch:
 
 jobs:
-  build:
-    permissions:
-      contents: "read"
-      checks: "write"
-      id-token: "write"
-      packages: "write"
+  build-and-test:
+    name: Build and Test
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-      image: "${{ steps.login.outputs.registry }}/${{ github.repository }}/pensjon-infotrygd-tp-mq-adapter:${{ env.VERSION }}"
-      image-digest: "${{ steps.login.outputs.registry }}/${{ github.repository }}/pensjon-infotrygd-tp-mq-adapter@${{ steps.build_push.outputs.digest }}"
-
+    permissions:
+      contents: read
+      checks: write
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
+        with:
+          java-version: 21
+          distribution: temurin
+          cache: maven
+      - name: Build and test
+        run: ./mvnw verify --no-transfer-progress
+      - name: Publish test report
+        uses: dorny/test-reporter@v3
+        if: always()
+        with:
+          name: Maven Tests
+          path: '**/target/surefire-reports/TEST-*.xml'
+          reporter: java-junit
+      - name: Upload JAR
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v7
+        with:
+          name: app-jar
+          path: target/adapter*.jar
+          retention-days: 1
 
+  build-image:
+    name: Build Image
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      image: "${{ steps.login.outputs.registry }}/${{ github.repository }}/pensjon-infotrygd-tp-mq-adapter:${{ steps.version.outputs.version }}"
+      image-digest: "${{ steps.login.outputs.registry }}/${{ github.repository }}/pensjon-infotrygd-tp-mq-adapter@${{ steps.build_push.outputs.digest }}"
+    steps:
+      - uses: actions/checkout@v7
       - name: Set version
         id: version
-        shell: bash
         run: |
           TIME=$(TZ="Europe/Oslo" date +%Y.%m.%d-%H.%M)
           COMMIT=$(git rev-parse --short=12 HEAD)
-          export VERSION="$TIME-$COMMIT"
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-
-      - uses: actions/setup-java@v5
+          echo "version=$TIME-$COMMIT" >> $GITHUB_OUTPUT
+      - name: Download JAR
+        uses: actions/download-artifact@v4
         with:
-          distribution: 'temurin'
-          java-version: '21'
-          cache: 'maven'
-
+          name: app-jar
+          path: target/
       - uses: docker/setup-buildx-action@v4
-
-      - name: Build
-        shell: bash
-        run: |
-          mvn -Drevision="${VERSION}" package
-        env:
-          TZ: "Europe/Oslo"
-
-      - name: Upload surefire reports on failure
-        uses: actions/upload-artifact@v7
-        if: failure()
-        with:
-          name: surefire-reports
-          path: ${{ github.workspace }}/**/target/surefire-reports/*
-          retention-days: 5
-
-      - name: Upload HotSpot Fatal Error logs on failure
-        uses: actions/upload-artifact@v7
-        if: failure()
-        with:
-          name: hotspot-fatal-error-logs
-          path: ${{ github.workspace }}/**/hs_err_pid*.log
-          retention-days: 5
-
       - name: NAIS login
-        if: github.ref == 'refs/heads/main'
         uses: nais/login@v0
         id: login
         with:
           project_id: ${{ vars.NAIS_MANAGEMENT_PROJECT_ID }}
           identity_provider: ${{ secrets.NAIS_WORKLOAD_IDENTITY_PROVIDER }}
           team: pensjonsamhandling
-
-      - name: "Build and publish Docker image"
-        if: github.ref == 'refs/heads/main'
-        id: build_push
+      - name: Build and push image
         uses: docker/build-push-action@v7
+        id: build_push
         with:
           context: .
-          file: Dockerfile
-          tags: "${{ steps.login.outputs.registry }}/${{ github.repository }}/pensjon-infotrygd-tp-mq-adapter:${{ env.VERSION }},${{ steps.login.outputs.registry }}/${{ github.repository }}/pensjon-infotrygd-tp-mq-adapter:main"
           push: true
-          cache-from: |
-            "type=registry,ref=${{ steps.login.outputs.registry }}/${{ github.repository }}/pensjon-infotrygd-tp-mq-adapter:main"
+          tags: |
+            ${{ steps.login.outputs.registry }}/${{ github.repository }}/pensjon-infotrygd-tp-mq-adapter:${{ steps.version.outputs.version }}
+            ${{ steps.login.outputs.registry }}/${{ github.repository }}/pensjon-infotrygd-tp-mq-adapter:main
+          cache-from: type=registry,ref=${{ steps.login.outputs.registry }}/${{ github.repository }}/pensjon-infotrygd-tp-mq-adapter:main
           cache-to: type=inline
 
-  attest-sign:
-    if: github.ref == 'refs/heads/main'
+  deploy-dev:
+    name: Deploy Dev (${{ matrix.env }})
+    needs: build-image
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
-    needs: [build]
-    runs-on: 'ubuntu-latest'
+    strategy:
+      matrix:
+        env: [q0, q1, q2]
     steps:
       - uses: actions/checkout@v7
+      - uses: nais/deploy/actions/deploy@v2
+        env:
+          IMAGE: ${{ needs.build-image.outputs.image }}
+          RESOURCE: .nais/nais.yaml
+          CLUSTER: dev-fss
+          VAR: version=${{ needs.build-image.outputs.version }}
+          VARS: .nais/vars-dev-${{ matrix.env }}.yaml
 
+  sign-and-deploy-prod:
+    name: Sign and Deploy Prod
+    needs: build-image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
       - name: NAIS login
         uses: nais/login@v0
         id: login
@@ -103,60 +117,22 @@ jobs:
           project_id: ${{ vars.NAIS_MANAGEMENT_PROJECT_ID }}
           identity_provider: ${{ secrets.NAIS_WORKLOAD_IDENTITY_PROVIDER }}
           team: pensjonsamhandling
-
-      - name: 'Generate SBOM'
+      - name: Generate SBOM
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          scan-type: 'image'
-          format: 'cyclonedx'
-          output: 'trivy-results.cyclonedx'
-          image-ref: "${{ needs.build.outputs.image-digest }}"
-
+          scan-type: image
+          format: cyclonedx
+          output: trivy-results.cyclonedx
+          image-ref: ${{ needs.build-image.outputs.image-digest }}
       - name: Attest and sign image
-        id: attest-sign
         uses: nais/attest-sign@v2
         with:
-          image_ref: "${{ needs.build.outputs.image-digest }}"
-          sbom: "trivy-results.cyclonedx"
-
-  deploy:
-    if: github.ref == 'refs/heads/main'
-    permissions:
-      contents: read
-      id-token: write
-    needs: [build]
-    runs-on: 'ubuntu-latest'
-    steps:
-      - uses: actions/checkout@v7
+          image_ref: ${{ needs.build-image.outputs.image-digest }}
+          sbom: trivy-results.cyclonedx
       - uses: nais/deploy/actions/deploy@v2
         env:
-          IMAGE: "${{ needs.build.outputs.image }}"
+          IMAGE: ${{ needs.build-image.outputs.image }}
           RESOURCE: .nais/nais.yaml
-          CLUSTER: 'prod-fss'
-          VAR: "version=${{ needs.build.outputs.version }}"
-          VARS: '.nais/vars-prod.yaml'
-
-  deployQ:
-    if: github.ref == 'refs/heads/main'
-    permissions:
-      contents: read
-      id-token: write
-    needs: [build]
-    runs-on: 'ubuntu-latest'
-
-    strategy:
-      matrix:
-        include:
-          - env: q0
-          - env: q1
-          - env: q2
-
-    steps:
-      - uses: actions/checkout@v7
-      - uses: nais/deploy/actions/deploy@v2
-        env:
-          IMAGE: "${{ needs.build.outputs.image }}"
-          RESOURCE: .nais/nais.yaml
-          CLUSTER: 'dev-fss'
-          VAR: "version=${{ needs.build.outputs.version }}"
-          VARS: '.nais/vars-dev-${{matrix.env}}.yaml'
+          CLUSTER: prod-fss
+          VAR: version=${{ needs.build-image.outputs.version }}
+          VARS: .nais/vars-prod.yaml
