@@ -125,7 +125,7 @@ jobs:
           output: trivy-results.cyclonedx
           image-ref: ${{ needs.build-image.outputs.image-digest }}
       - name: Attest and sign image
-        uses: nais/attest-sign@v2
+        uses: nais/attest-sign@v2.0.15
         with:
           image_ref: ${{ needs.build-image.outputs.image-digest }}
           sbom: trivy-results.cyclonedx
