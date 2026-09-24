@@ -93,7 +93,7 @@ jobs:
         env: [q0, q1, q2]
     steps:
       - uses: actions/checkout@v7
-      - uses: nais/deploy/actions/deploy@v2
+      - uses: nais/deploy/actions/deploy@v3
         env:
           IMAGE: ${{ needs.build-image.outputs.image }}
           RESOURCE: .nais/nais.yaml
@@ -129,7 +129,7 @@ jobs:
         with:
           image_ref: ${{ needs.build-image.outputs.image-digest }}
           sbom: trivy-results.cyclonedx
-      - uses: nais/deploy/actions/deploy@v2
+      - uses: nais/deploy/actions/deploy@v3
         env:
           IMAGE: ${{ needs.build-image.outputs.image }}
           RESOURCE: .nais/nais.yaml
