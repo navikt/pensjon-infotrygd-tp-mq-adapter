@@ -1,0 +1,43 @@
+name: Build and Test Branch
+
+on:
+  push:
+    branches:
+      - '*'
+      - '*/**'
+      - '!release/*'
+      - '!master'
+      - '!main'
+      - '!sandbox'
+
+jobs:
+  build-branch:
+    name: Build branch ${{ github.ref_name }}
+    permissions:
+      contents: read
+      id-token: write
+      checks: write
+      packages: read
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.docker-build-push.outputs.image }}
+      telemetry: ${{ steps.docker-build-push.outputs.telemetry }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Setup Java 25 (Temurin)
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 25
+          cache: maven
+
+      - name: compile and run tests
+        run: mvn install --no-transfer-progress
+
+      - name: Publish Test Report
+        uses: dorny/test-reporter@v3
+        if: always()
+        with:
+          name: Maven Tests Report
+          path: '**/target/surefire-reports/TEST-*.xml,**/target/failsafe-reports/TEST-*.xml'
+          reporter: java-junit
