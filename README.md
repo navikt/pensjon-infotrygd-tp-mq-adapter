@@ -44,7 +44,7 @@ Applikasjonen bruker CopyBook-meldingsformatet `K278M402`.
 ## Tech stack
 
 - **Språk:** Kotlin · Java 21
-- **Rammeverk:** Spring Boot 3
+- **Rammeverk:** Spring Boot 4
 - **Meldingskø:** IBM MQ (JMS)
 - **Auth:** Azure AD client_credentials
 - **Plattform:** Nais (FSS) · Vault · OpenTelemetry → Elastic APM

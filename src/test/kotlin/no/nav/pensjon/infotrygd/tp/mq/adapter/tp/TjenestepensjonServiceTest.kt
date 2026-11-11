@@ -2,12 +2,18 @@ package no.nav.pensjon.infotrygd.tp.mq.adapter.tp
 
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.springframework.context.annotation.AnnotationConfigApplicationContext
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Configuration
 import org.springframework.http.HttpMethod
 import org.springframework.http.MediaType
+import org.springframework.retry.annotation.EnableRetry
+import org.springframework.test.web.client.ExpectedCount.times
 import org.springframework.test.web.client.MockRestServiceServer
 import org.springframework.test.web.client.match.MockRestRequestMatchers.header
 import org.springframework.test.web.client.match.MockRestRequestMatchers.method
 import org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo
+import org.springframework.test.web.client.response.MockRestResponseCreators.withServerError
 import org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess
 import org.springframework.web.client.RestClient
 import java.time.LocalDate
@@ -20,13 +26,15 @@ import kotlin.test.assertTrue
 class TjenestepensjonServiceTest {
 
     private lateinit var server: MockRestServiceServer
+    private lateinit var restClient: RestClient
     private lateinit var service: TjenestepensjonService
 
     @BeforeEach
     fun setUp() {
         val builder = RestClient.builder()
         server = MockRestServiceServer.bindTo(builder).build()
-        service = TjenestepensjonService(builder.build())
+        restClient = builder.build()
+        service = TjenestepensjonService(restClient)
     }
 
     // --- YtelseModel datofiltrering ---
@@ -120,5 +128,63 @@ class TjenestepensjonServiceTest {
         assertFailsWith<RuntimeException> {
             service.hentTjenestepensjon("12345678901")
         }
+    }
+
+    @Test
+    fun `hentTjenestepensjon ignores unknown fields and reads nullable dates`() {
+        val json = """
+            {
+                "unknown": "ignored",
+                "forhold": [
+                    {"ordning": "3010", "ytelser": [], "unknown": true},
+                    {
+                        "ordning": "3200",
+                        "ytelser": [{
+                            "type": "ALDER",
+                            "datoYtelseIverksattFom": null,
+                            "datoYtelseIverksattTom": "2025-12-31",
+                            "unknown": 42
+                        }]
+                    }
+                ]
+            }
+        """.trimIndent()
+
+        server.expect(requestTo("/api/tjenestepensjon/"))
+            .andRespond(withSuccess(json, MediaType.APPLICATION_JSON))
+
+        val result = service.hentTjenestepensjon("12345678901")
+
+        assertEquals(emptyList(), result[0].ytelser)
+        assertNull(result[1].ytelser[0].datoYtelseIverksattFom)
+        assertEquals(LocalDate.of(2025, 12, 31), result[1].ytelser[0].datoYtelseIverksattTom)
+        server.verify()
+    }
+
+    @Test
+    fun `hentTjenestepensjon retries failed requests up to three attempts`() {
+        server.expect(times(2), requestTo("/api/tjenestepensjon/"))
+            .andRespond(withServerError())
+        server.expect(requestTo("/api/tjenestepensjon/"))
+            .andRespond(withSuccess("""{"forhold":[]}""", MediaType.APPLICATION_JSON))
+
+        AnnotationConfigApplicationContext().use { context ->
+            context.register(RetryConfiguration::class.java)
+            context.beanFactory.registerSingleton("tpRestClient", restClient)
+            context.refresh()
+
+            val result = context.getBean(TjenestepensjonService::class.java)
+                .hentTjenestepensjon("12345678901")
+
+            assertEquals(emptyList(), result)
+            server.verify()
+        }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    @EnableRetry
+    class RetryConfiguration {
+        @Bean
+        fun tjenestepensjonService(tpRestClient: RestClient) = TjenestepensjonService(tpRestClient)
     }
 }
