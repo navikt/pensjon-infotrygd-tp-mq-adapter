@@ -56,7 +56,7 @@ jobs:
           name: app-jar
           path: target/
       - name: Build and push image
-        uses: nais/docker-build-push@v0
+        uses: nais/docker-build-push@v1
         id: docker-build-push
         with:
           team: pensjonsamhandling
